@@ -303,7 +303,7 @@ def chevent(bot,trigger):
 		try:
 			newtime=parse_time(cmnd[2], kd_time=bot.memory['kd_events'][int(cmnd[0])].time)
 		except:
-			bot.say("invalid time format. Use unixtime with decimals")
+			bot.reply("Incorrect time format. Refer to https://github.com/flashcactus/kountdown/wiki/Time-Format for valid formats.")
 			return
 		bot.memory['kd_events'][int(cmnd[0])].time=newtime
 		bot.memory['kd_queue']=bot.memory['kd_events'][int(cmnd[0])].rebuildqueue(bot.memory['kd_queue'])
