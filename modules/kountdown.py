@@ -85,24 +85,46 @@ def timestr(unixtime=None, offset=0, fstring="%Y-%m-%d %H:%M:%S UTC%z"):
 	return time.strftime(fstring,tt)
 
 
-class ParsingException(Exception):
+class ParsingError(Exception):
 	pass
 
 time_patterns = (
-re.compile("[Uu](\d{4,5})-(\d{1,2})-(\d{1,2}) (\d{1,2})[:.](\d{1,2})[:.](\d{1,2})"), 
+re.compile("[Uu](\d{4,5})-(\d{1,2})-(\d{1,2})-(\d{1,2})[:.](\d{1,2})[:.](\d{1,2})"), 
 re.compile("[nN]\+?(?:(?:(?:(\d+):)?(\d+):)?(\d+):)?(\d+)"),
-re.compile("[cCkK]?[-+](?:(?:(?:(\d+):)?(\d+):)?(\d+):)?(\d+)"),
+re.compile("[cCkK]?([-+])(?:(?:(?:(\d+):)?(\d+):)?(\d+):)?(\d+)"),
 )
 
 def parse_time( t_string, kd_time=None):
-	'''Parses a time string, in some of the following formats:
+	'''Parses a time string, in the following formats:
 	raw unixtime: 	 		%s	
 	UTC: 		 		[uU]%Y-%m-%d-%H[:.]%M[:.]%S
 	relative to now: 		[nN]\+?(((%d:)?%h:)?%m:)?%s
 	relative to current kd time: 	[cCkK]?[-+](((%d:)?%h:)?%m:)?%s
-	The last one depends on the kd_time argument, if it is none and time is given in that format, raises a ParsingException.
+	The last one depends on the kd_time argument, if it is none and time is given in that format, raises a ParsingError.
 	'''
-	(mutc, mrn, mrk) = ( p.match(t_string) for p in time_patterns)
+	t_string = t_string.strip()
+	mutc, mrn, mrk = (p.match(t_string) for p in time_patterns)
+	if mutc:
+		ts = time.strptime(t_string.replace('.', ':')[1:], "%Y-%m-%d-%H:%M:%S")	
+		secs=int(time.strftime('%s', ts))	#dirty hack to have the time-tuple interpreted as UTC no matter what the local timezone is
+		return secs
+	elif mrn:
+		days,hrs,mins,secs = (0 if mrn.group(t) is None else int(mrn.group(t)) for t in range(1,5))
+		return int(time.time()) + days*3600*24 + hrs*3600 + mins*60 + secs
+	elif mrk:
+		if kd_time is not None:
+			sign = 1 if mrk.group(1)=='+' else -1
+			days,hrs,mins,secs = (0 if mrk.group(t) is None else int(mrk.group(t)) for t in range(2,6))
+			return int(kd_time) + sign * (days*3600*24 + hrs*3600 + mins*60 + secs)
+			
+		else:
+			raise ParsingError('Time in rel-kd format, but kd_time not given!')
+	elif t_string.isdigit():
+		return int(t_string)
+	else:
+		raise  ParsingError('Unknown time format')
+
+
 ###################################################################
 
 def setup(bot):
@@ -149,12 +171,8 @@ def setup(bot):
 @willie.module.commands('addevent','addevt','addkd','kdadd')
 def addevt(bot,trigger):
 	'''Add countdown event. 
-Syntax: .addevent name|description|unixtime
-
-Hint: use ".wa <time> in unixtime" to convert whatever time format you're using (don't forget to add your timezone to the wa query).
-You can also use kmath's ;wa instead, it seems to be somewhat faster.
-
-Available only to kd-admins.
+Syntax: .addevent name|description|time. Refer to https://github.com/flashcactus/kountdown/wiki/Time-Format for valid time formats.
+This command is currently available only to kd-admins.
 '''
 	if str(trigger.nick) not in bot.memory['kd_admins']:
 		bot.say("admin-only command.")
@@ -166,7 +184,10 @@ Available only to kd-admins.
 	cline=trigger.group(2).split('|')
 	name=cline[0]
 	desc=cline[1]
-	s_time=int(cline[2])
+	try:
+		s_time = parse_time(cline[2])
+	except ParsingError:
+		bot.reply("Wrong time format. See https://github.com/flashcactus/kountdown/wiki/Time-Format for valid formats.")
 	bot.memory['kd_events'][evnctr]=Event(evnctr,name,desc,s_time,bot)
 	bot.config.kdown.ev_ctr=evnctr+1
 	saveevents(bot)
@@ -175,7 +196,7 @@ Available only to kd-admins.
 
 @willie.module.commands('lsevents','lskd','kdls','lsevt')
 def lsevents(bot,trigger):
-	'''.lsevents, .lskd, .kdls, .lsevt: list pending Kountdown Events)'''
+	'''.lsevents, .lskd, .kdls, .lsevt: list pending Kountdown Events'''
 	if not len(bot.memory['kd_events']):
 		bot.reply("No scheduled events right now.")
 	else:
@@ -268,7 +289,8 @@ def chevent(bot,trigger):
 	.editevent, .chevent, .chevt, .chkd: Edit an event.
 	Syntax: .editevent <event_id> (t[ime]|n[ame]|d[esc]) <value>. 
 	 
-	      The time must be in unixtime format (use .wa <your-time> in unixtime to convert); 
+	      The time must be in one of the formats defined  on the following page:
+	      https://github.com/flashcactus/kountdown/wiki/Time-Format
 	      Name&desc must not contain the pipe character (bug cactus if you really want it).
 	      You could get the event id and current values via the .lsevents command.
 	'''
@@ -279,7 +301,7 @@ def chevent(bot,trigger):
 		bot.say("I don't know of an active event with id %s." % cmnd[0])
 	elif cmnd[1][0]=='t':
 		try:
-			newtime=float(cmnd[2])
+			newtime=parse_time(cmnd[2], kd_time=bot.memory['kd_events'][int(cmnd[0])].time)
 		except:
 			bot.say("invalid time format. Use unixtime with decimals")
 			return
