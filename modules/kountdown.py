@@ -106,7 +106,7 @@ def parse_time( t_string, kd_time=None):
 	mutc, mrn, mrk = (p.match(t_string) for p in time_patterns)
 	if mutc:
 		ts = time.strptime(t_string.replace('.', ':')[1:], "%Y-%m-%d-%H:%M:%S")	
-		secs=int(time.strftime('%s', ts))	#dirty hack to have the time-tuple interpreted as UTC no matter what the local timezone is
+		secs = int(time.mktime(ts)) - time.timezone
 		return secs
 	elif mrn:
 		days,hrs,mins,secs = (0 if mrn.group(t) is None else int(mrn.group(t)) for t in range(1,5))
@@ -128,6 +128,8 @@ def parse_time( t_string, kd_time=None):
 ###################################################################
 
 def setup(bot):
+	time.tzset()
+
 	ctime = time.time()
 	bot.memory['kd_queue']=[]
 	
@@ -162,7 +164,7 @@ def setup(bot):
 	admins.update(set(bot.config.kdown.get_list('admins')))
 	admins.add(bot.config.core.owner)
 	bot.memory['kd_admins']=admins
-	print(bot.memory['kd_admins'])
+#	print(bot.memory['kd_admins'])
 
 
 
