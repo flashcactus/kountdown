@@ -23,7 +23,7 @@ def summon_ops(bot, trigger):
 			bot.reply("An other person must confirm this, not you.")
 		else:
 			ops = bot.ops.get(chan, [])
-			bot.say("Hailing all ops! " + ", ".join(ops) + "! " + trigger.nick.strip() + " requests your attention." )
+			bot.say("Hailing all ops! " + ", ".join(ops) + "! " + dtuple[1] + " and " + nick + " request your attention." )
 	else:
 		bot.reply("Are you sure? If this truly is an emergency, then another person on the channel must type this command within the next " + str(bot.memory['summonops_interv']) + " seconds." )
 		bot.memory['summonops_delay'][chan] = (time.time(), nick)
