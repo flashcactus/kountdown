@@ -3,7 +3,10 @@ import willie
 
 def setup(bot):
 	bot.memory['summonops_delay'] = {}
-	bot.memory['summonops_interv'] = 15
+	try:
+		bot.memory['summonops_interv'] = int(bot.config.summonops.approve_time)
+	except:
+		bot.memory['summonops_interv'] = 15
 
 @willie.module.commands('ops','summonops')
 def summon_ops(bot, trigger):
