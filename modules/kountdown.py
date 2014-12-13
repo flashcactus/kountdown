@@ -188,6 +188,9 @@ This command is currently available only to kd-admins.
 	desc=cline[1]
 	try:
 		s_time = parse_time(cline[2])
+		if cline[2].isdigit():
+			bot.reply("You used unixtime here, which means you might be unaware of the new convenient time formats. See https://github.com/flashcactus/kountdown/wiki/Time-Format for details.")
+
 	except ParsingError:
 		bot.reply("Wrong time format. See https://github.com/flashcactus/kountdown/wiki/Time-Format for valid formats.")
 	bot.memory['kd_events'][evnctr]=Event(evnctr,name,desc,s_time,bot)
@@ -304,6 +307,8 @@ def chevent(bot,trigger):
 	elif cmnd[1][0]=='t':
 		try:
 			newtime=parse_time(cmnd[2], kd_time=bot.memory['kd_events'][int(cmnd[0])].time)
+			if cmnd[2].isdigit():
+				bot.reply("You used unixtime here, which means you're possibly unaware of the new time formats. See https://github.com/flashcactus/kountdown/wiki/Time-Format for details.")
 		except:
 			bot.reply("Incorrect time format. Refer to https://github.com/flashcactus/kountdown/wiki/Time-Format for valid formats.")
 			return
