@@ -21,8 +21,12 @@ def citation(bot, trigger):
 	bot.reply(random.choice(citations))
 
 
-@willie.module.rule('^\x01ACTION +[Ss]tare.*$')
+@willie.module.rule('^\x01ACTION +(?:[Ss]tare|[Gg]lare).*$')
 #@willie.module.rule('^.*[KkCc]ountdown.*$')
-def stare_back(bot,trigger):
-        bot.msg(trigger.sender,"\x01ACTION stares at "+trigger.nick+"\x01")
+def stare_back(bot, trigger):
+        bot.msg(trigger.sender,"\x01ACTION glares at "+trigger.nick+"\x01")
 
+@willie.module.rule('.*[Gg]ood [Bb]ot.*$')
+@willie.module.rule('.*[Bb]ot ?snack!?.*$')
+def snack(bot, trigger):
+	bot.reply('Thank you! Glad to be of service.')
