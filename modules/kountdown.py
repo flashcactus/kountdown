@@ -90,17 +90,18 @@ class ParsingError(Exception):
 
 time_patterns = (
 re.compile("[Uu](\d{4,5})-(\d{1,2})-(\d{1,2})-(\d{1,2})[:.](\d{1,2})[:.](\d{1,2})"), 
-re.compile("[nN]\+?(?:(?:(?:(\d+):)?(\d+):)?(\d+):)?(\d+)"),
-re.compile("[cCkK]?([-+])(?:(?:(?:(\d+):)?(\d+):)?(\d+):)?(\d+)"),
+re.compile("[nN]\+?(?:(?:(?:(\d+)[:.])?(\d+)[:.])?(\d+)[:.])?(\d+)"),
+re.compile("[cCkK]?([-+])(?:(?:(?:(\d+)[:.])?(\d+)[:.])?(\d+)[:.])?(\d+)"),
 )
 
 def parse_time( t_string, kd_time=None):
 	'''Parses a time string, in the following formats:
 	raw unixtime: 	 		%s	
-	UTC: 		 		[uU]%Y-%m-%d-%H[:.]%M[:.]%S
+	UTC: 		 		[uU]%Y-%m-%d-%H:%M:%S
 	relative to now: 		[nN]\+?(((%d:)?%h:)?%m:)?%s
-	relative to current kd time: 	[cCkK]?[-+](((%d:)?%h:)?%m:)?%s
-	The last one depends on the kd_time argument, if it is none and time is given in that format, raises a ParsingError.
+	relative to kd_time: 		[cCkK]?[-+](((%d:)?%h:)?%m:)?%s
+	Using .s instead of :s is also okay.
+	The last one depends on the kd_time argument, if it is None and time is given in that format, raises a ParsingError.
 	'''
 	t_string = t_string.strip()
 	mutc, mrn, mrk = (p.match(t_string) for p in time_patterns)
