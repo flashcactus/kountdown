@@ -61,4 +61,16 @@ def redirpc(bot,trigger):
 		if bot.memory.get('cactrack_name', False):
 			bot.msg( bot.memory['cactrack_name'],  "%s in %s : %s" % (trigger.nick, trigger.sender, trigger.group(1)))
 
-
+@willie.module.commands('link', 'ltell')
+def postlink(bot, trigger):
+	links = {
+		'markov':'http://agiliq.com/blog/2009/06/generating-pseudo-random-text-with-markov-chains-u/',
+		'ktime':'https://github.com/flashcactus/kountdown/wiki/Time-Format',
+		'timeformat':'https://github.com/flashcactus/kountdown/wiki/Time-Format',
+	}
+	target, key = trigger.group(2).strip().split(' ', 1)
+	link = links.get(key.lower().replace(' ', ''))
+	if link:
+		bot.say(target + ': ' + link)
+	else:
+		bot.reply(key + " not found.")
