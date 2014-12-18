@@ -5,6 +5,7 @@ import sys
 import sqlite3
 import codecs
 import threading
+import time
 
 #------sql.py-------
 
@@ -172,43 +173,6 @@ class Parser:
 
 #---markov.py---
 #
-#SENTENCE_SEPARATOR = '.'
-#WORD_SEPARATOR = ' '
-#
-#if __name__ == '__main__':
-#	args = sys.argv
-#	usage = 'Usage: %s (parse <name> <depth> <path to txt file>|gen <name> <count>)' % (args[0], )
-#
-#	if (len(args) < 3):
-#		raise ValueError(usage)
-#
-#	mode  = args[1]
-#	name  = args[2]
-#	
-#	if mode == 'parse':
-#		if (len(args) != 5):
-#			raise ValueError(usage)
-#		
-#		depth = int(args[3])
-#		file_name = args[4]
-#		
-#		db = Db(sqlite3.connect(name + '.db'), Sql())
-#		db.setup(depth)
-#		
-#		txt = codecs.open(file_name, 'r', 'utf-8').read()
-#		Parser(name, db, SENTENCE_SEPARATOR, WORD_SEPARATOR).parse(txt)
-#	
-#	elif mode == 'gen':
-#		count = int(args[3])
-#		db = Db(sqlite3.connect(name + '.db'), Sql())
-#		generator = Generator(name, db)
-#		for i in range(0, count):
-#			print generator.generate(WORD_SEPARATOR)
-#	
-#	else:
-#		raise ValueError(usage)
-#
-#
 SENTENCE_SEPARATOR = '\n'
 WORD_SEPARATOR = ' '
 
@@ -216,6 +180,8 @@ addwl=['markovchaincactus', 'theothercactus', '#kspofficial'] #whitelisted chann
 
 def setup(bot):
 	bot.memory['markov_db'] = '/home/cactus/.willie/markov4.db'
+	bot.memory['markov_randline_probdiv'] = 6000
+	bot.memory['markov_randline_lastts'] = 0
 	if not bot.memory.setdefault('markov_firstwordcache', {}):
 		print('generating first-word cache...')
 		print(gen_new_fwcache(bot))
@@ -227,8 +193,8 @@ def gen_new_fwcache(bot):#generate a quick-lookup buffer for first words (as it 
 	del db
 	return len(bot.memory['markov_firstwordcache'])
 
-@willie.module.commands('mgen', 'markov', 'spit', 'spew', 'rline')
-@willie.module.rule('(?i)^$nickname.*|.*$nickname(?:.{0,5}|.+[?!])$|.*automatic appeals.*')
+@willie.module.commands('mgen', 'markov', 'spit', 'spew', 'rline',  'mission')
+@willie.module.rule('(?i).*$nickname.*|.*automatic ?appeals.*')#('(?i)^$nickname.*|.*$nickname(?:.{0,5}|.+[?!])$|.*automatic appeals.*')
 def spitline(bot, trigger):
 	'''.mgen, .markov, .spit, .spew, .rline: spits out a random line generated from the channel logs'''
 	db = Db(sqlite3.connect(bot.memory['markov_db']), Sql()) #DB objects are not shareable between threads, so we need to create a new one each time.
@@ -236,6 +202,16 @@ def spitline(bot, trigger):
 		gen_new_fwcache(bot) #generate the cache if we don't have any
 	bot.say(genline(db, bot.memory['markov_firstwordcache'], WORD_SEPARATOR))
 	del db
+
+@willie.module.rule('.*')
+def randspitline(bot, trigger):	
+	probdiv = bot.memory['markov_randline_probdiv']
+	lastts = bot.memory['markov_randline_lastts']
+	bot.memory['markov_randline_lastts'] = time.time()
+	prob = (time.time() - lastts) / probdiv
+	if random.random() <= prob:
+		spitline(bot, trigger)
+	
 
 addline_mutex = threading.BoundedSemaphore(1)
 @willie.module.rule('^[^.].*$')
@@ -276,10 +252,10 @@ def genline(db, fwcache, word_separator=' '):
 			break
 		candidate_words = db.get_word_count(tail)
 		if len(candidate_words) > 1:
-			print(len(candidate_words), tail)
+			print(str(len(candidate_words)) + str(tail))
 			if len(candidate_words) < 10:
 				print(candidate_words)
 		word = select_next_word(candidate_words)
 		sentence.append(word)
+	print('')
 	return word_separator.join(sentence[depth-1:][:1-depth])
-	print()
