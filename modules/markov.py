@@ -4,6 +4,7 @@ import re
 import sys
 import sqlite3
 import codecs
+import threading
 
 #------sql.py-------
 
@@ -215,8 +216,9 @@ addwl=['markovchaincactus', 'theothercactus', '#kspofficial'] #whitelisted chann
 
 def setup(bot):
 	bot.memory['markov_db'] = '/home/cactus/.willie/markov4.db'
-	print('generating first-word cache...')
-	print(gen_new_fwcache(bot))
+	if not bot.memory.setdefault('markov_firstwordcache', {}):
+		print('generating first-word cache...')
+		print(gen_new_fwcache(bot))
 
 def gen_new_fwcache(bot):#generate a quick-lookup buffer for first words (as it tends to be quite sizeable)
 	db = Db(sqlite3.connect(bot.memory['markov_db']), Sql())
@@ -226,7 +228,7 @@ def gen_new_fwcache(bot):#generate a quick-lookup buffer for first words (as it 
 	return len(bot.memory['markov_firstwordcache'])
 
 @willie.module.commands('mgen', 'markov', 'spit', 'spew', 'rline')
-@willie.module.rule('^$nickname.*|.*$nickname(?:.{0,2}|.+[?!])$')
+@willie.module.rule('(?i)^$nickname.*|.*$nickname(?:.{0,5}|.+[?!])$|.*automatic appeals.*')
 def spitline(bot, trigger):
 	'''.mgen, .markov, .spit, .spew, .rline: spits out a random line generated from the channel logs'''
 	db = Db(sqlite3.connect(bot.memory['markov_db']), Sql()) #DB objects are not shareable between threads, so we need to create a new one each time.
@@ -235,15 +237,19 @@ def spitline(bot, trigger):
 	bot.say(genline(db, bot.memory['markov_firstwordcache'], WORD_SEPARATOR))
 	del db
 
+addline_mutex = threading.BoundedSemaphore(1)
 @willie.module.rule('^[^.].*$')
 def addline(bot, trigger):
 	'''adds line to markov-chain DB'''
 	if trigger.sender.lower() not in addwl:
 		return
+	addline_mutex.acquire()
+	conn = sqlite3.connect(bot.memory['markov_db'])
 	db = Db(sqlite3.connect(bot.memory['markov_db']), Sql())
 	sentence=trigger.group(0)
 	Parser('', db, SENTENCE_SEPARATOR, WORD_SEPARATOR).parse(sentence)
-	del db 
+	del db
+	addline_mutex.release()
 	firstword = sentence.split()[0]
 	bot.memory['markov_firstwordcache'][firstword] = bot.memory['markov_firstwordcache'].setdefault(firstword, 0) + 1
 
@@ -262,15 +268,18 @@ def genline(db, fwcache, word_separator=' '):
 	'''generates a line to be spat out.'''
 	depth = db.get_depth()
  	#look the first word up in the cache
-	sentence = [Parser.SENTENCE_START_SYMBOL] * (depth - 2) + [select_next_word(fwcache)]
+	sentence = [Parser.SENTENCE_START_SYMBOL] * (depth - 1) + [select_next_word(fwcache)]
 	end_symbol = [Parser.SENTENCE_END_SYMBOL] * (depth - 1)
-
 	while True:
 		tail = sentence[(-depth+1):]
 		if tail == end_symbol:
 			break
 		candidate_words = db.get_word_count(tail)
+		if len(candidate_words) > 1:
+			print(len(candidate_words), tail)
+			if len(candidate_words) < 10:
+				print(candidate_words)
 		word = select_next_word(candidate_words)
 		sentence.append(word)
-	
 	return word_separator.join(sentence[depth-1:][:1-depth])
+	print()

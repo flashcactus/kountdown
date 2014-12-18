@@ -60,17 +60,38 @@ def redirpc(bot,trigger):
 		bot.msg(bot.config.core.owner, "%s in %s : %s" % (trigger.nick, trigger.sender, trigger.group(1)))
 		if bot.memory.get('cactrack_name', False):
 			bot.msg( bot.memory['cactrack_name'],  "%s in %s : %s" % (trigger.nick, trigger.sender, trigger.group(1)))
+	
 
-@willie.module.commands('link', 'ltell')
-def postlink(bot, trigger):
-	links = {
-		'markov':'http://agiliq.com/blog/2009/06/generating-pseudo-random-text-with-markov-chains-u/',
-		'ktime':'https://github.com/flashcactus/kountdown/wiki/Time-Format',
-		'timeformat':'https://github.com/flashcactus/kountdown/wiki/Time-Format',
-	}
+###############-links-###############
+
+links = {
+	'repo':'https://github.com/flashcactus/kountdown',
+
+	'ktime':'https://github.com/flashcactus/kountdown/wiki/Time-Format',
+	'timeformat':'https://github.com/flashcactus/kountdown/wiki/Time-Format',
+	
+	'rokkergram':'http://legion.flashcact.us/pub/wordcloud/kspotrolls.png',
+	'kspocloud':'http://legion.flashcact.us/pub/wordcloud/kspotrolls.png',
+	'kspotrolls':'http://legion.flashcact.us/pub/wordcloud/kspotrolls.txt',
+	
+	'markov':'http://agiliq.com/blog/2009/06/generating-pseudo-random-text-with-markov-chains-u/',
+}
+
+@willie.module.commands('ltell')
+def telllink(bot, trigger):
 	target, key = trigger.group(2).strip().split(' ', 1)
 	link = links.get(key.lower().replace(' ', ''))
 	if link:
 		bot.say(target + ': ' + link)
 	else:
 		bot.reply(key + " not found.")
+
+@willie.module.commands('link')
+def postlink(bot, trigger):
+	key = trigger.group(2).strip()
+	link = links.get(key.lower().replace(' ', ''))
+	if link:
+		bot.reply(link)
+	else:
+		bot.reply(key + " not found.")
+
