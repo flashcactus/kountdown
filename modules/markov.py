@@ -179,9 +179,10 @@ WORD_SEPARATOR = ' '
 addwl=['markovchaincactus', 'theothercactus', '#kspofficial'] #whitelisted channels (the ones that lines will be added from)
 
 def setup(bot):
-	bot.memory['markov_db'] = '/home/cactus/.willie/markov4.db'
-	bot.memory['markov_randline_probdiv'] = 6000
-	bot.memory['markov_randline_lastts'] = 0
+	bot.memory['markov_db'] = bot.config.markov.db #'/home/cactus/.willie/markov4.db'
+	bot.memory['markov_randline_probdiv'] = bot.config.markov.probdiv #1800
+	bot.memory['markov_randline_lastts'] = {}
+	bot.memory['markov_autochans'] = set(bot.config.markov.get_list('autochans'))
 	if not bot.memory.setdefault('markov_firstwordcache', {}):
 		print('generating first-word cache...')
 		print(gen_new_fwcache(bot))
@@ -193,58 +194,15 @@ def gen_new_fwcache(bot):#generate a quick-lookup buffer for first words (as it 
 	del db
 	return len(bot.memory['markov_firstwordcache'])
 
-@willie.module.commands('mgen', 'markov', 'spit', 'spew', 'rline',  'mission')
-@willie.module.rule('(?i).*$nickname.*|.*automatic ?appeals.*')#('(?i)^$nickname.*|.*$nickname(?:.{0,5}|.+[?!])$|.*automatic appeals.*')
-def spitline(bot, trigger):
-	'''.mgen, .markov, .spit, .spew, .rline: spits out a random line generated from the channel logs'''
+
+def genline(bot, word_separator=' '):
+	'''generates a random line.'''
 	db = Db(sqlite3.connect(bot.memory['markov_db']), Sql()) #DB objects are not shareable between threads, so we need to create a new one each time.
 	if not bot.memory['markov_firstwordcache']:
 		gen_new_fwcache(bot) #generate the cache if we don't have any
-	bot.say(genline(db, bot.memory['markov_firstwordcache'], WORD_SEPARATOR))
-	del db
-
-@willie.module.rule('.*')
-def randspitline(bot, trigger):	
-	probdiv = bot.memory['markov_randline_probdiv']
-	lastts = bot.memory['markov_randline_lastts']
-	bot.memory['markov_randline_lastts'] = time.time()
-	prob = (time.time() - lastts) / probdiv
-	if random.random() <= prob:
-		spitline(bot, trigger)
-	
-
-addline_mutex = threading.BoundedSemaphore(1)
-@willie.module.rule('^[^.].*$')
-def addline(bot, trigger):
-	'''adds line to markov-chain DB'''
-	if trigger.sender.lower() not in addwl:
-		return
-	addline_mutex.acquire()
-	conn = sqlite3.connect(bot.memory['markov_db'])
-	db = Db(sqlite3.connect(bot.memory['markov_db']), Sql())
-	sentence=trigger.group(0)
-	Parser('', db, SENTENCE_SEPARATOR, WORD_SEPARATOR).parse(sentence)
-	del db
-	addline_mutex.release()
-	firstword = sentence.split()[0]
-	bot.memory['markov_firstwordcache'][firstword] = bot.memory['markov_firstwordcache'].setdefault(firstword, 0) + 1
-
-def select_next_word(candidate_words):
-	'''Selects the next word in the chain.'''
-	total_next_words = sum(candidate_words.values())
-	i = random.randint(1, total_next_words)
-	t=0
-	for w in candidate_words.keys():
-		t += candidate_words[w]
-		if (i <= t):
-			return w
-	assert False
-
-def genline(db, fwcache, word_separator=' '):
-	'''generates a line to be spat out.'''
 	depth = db.get_depth()
  	#look the first word up in the cache
-	sentence = [Parser.SENTENCE_START_SYMBOL] * (depth - 1) + [select_next_word(fwcache)]
+	sentence = [Parser.SENTENCE_START_SYMBOL] * (depth - 1) + [select_next_word(bot.memory['markov_firstwordcache'])]
 	end_symbol = [Parser.SENTENCE_END_SYMBOL] * (depth - 1)
 	while True:
 		tail = sentence[(-depth+1):]
@@ -257,5 +215,109 @@ def genline(db, fwcache, word_separator=' '):
 				print(candidate_words)
 		word = select_next_word(candidate_words)
 		sentence.append(word)
+	del db
 	print('')
 	return word_separator.join(sentence[depth-1:][:1-depth])
+	
+
+def select_next_word(candidate_words):
+	'''Selects the next word in the chain.'''
+	total_next_words = sum(candidate_words.values())
+	i = random.randint(1, total_next_words)
+	t=0
+	for w in candidate_words.keys():
+		t += candidate_words[w]
+		if (i <= t):
+			return w
+	assert False
+
+
+@willie.module.commands('mgen', 'markov', 'spit', 'spew', 'rline',  'mission')
+def spitline(bot, trigger):
+	'''.mgen, .markov, .spit, .spew, .rline: spits out a random line generated from the channel logs'''
+	bot.say(genline(bot))
+
+@willie.module.commands('mrkon')
+def chansubscr(bot,trigger):
+	'''.mrkon [channel]: Turns on unprompted random lines in a particular channel. This command is only available to the ops of the channel in question and bot admins. If channel argument is not given, subscribes the channel the command is issued in.'''
+	chan=trigger.group(2)
+	chan=chan.strip() if chan else trigger.sender
+	if str(trigger.nick) in bot.ops.get(chan, []) or str(trigger.nick) in bot.config.core.get_list('admins'):
+		chan=chan.lower()
+		if chan in bot.memory['markov_autochans']:
+			bot.say('automarkov is already on here.')
+			return
+		bot.memory['markov_autochans'].add(chan)
+		bot.config.markov.autochans=list(bot.memory['markov_autochans'])
+		bot.config.save()
+		bot.say('Done.')
+	else:
+		bot.say('nope')
+
+@willie.module.commands('mrkoff')
+def chanunsub(bot,trigger):
+	'''.mrkoff [channel]: Turns off unprompted random lines in a particular channel. See .help subschan for details.'''
+	chan=trigger.group(2)
+	chan=chan.strip() if chan else trigger.sender
+	if str(trigger.nick) in bot.ops.get(chan, []) or str(trigger.nick) in bot.config.core.get_list('admins'):
+		chan=chan.lower()
+		try:
+			bot.memory['markov_autochans'].remove(chan)
+		except KeyError:
+			bot.say('automarkov is already off here.')
+			return
+		bot.config.markov.autochans=list(bot.memory['markov_autochans'])
+		bot.config.save()
+		bot.say('Done.')
+	else:
+		bot.say('nope')
+
+@willie.module.rule('(?i)^$nickname[,:!].*|.*$nickname(?:.{0,5}|.+[?!])$|.*automatic appeals.*')
+def asl(bot, trigger):
+#	if trigger.sender.strip().lower() not in bot.memory['markov_autochans']:
+#		return
+	spitline(bot, trigger)
+
+
+@willie.module.rule('.*')
+def upd_rsl_counter(bot, trigger):
+	if trigger.sender.strip().lower() not in bot.memory['markov_autochans']:
+		return
+	np = bot.memory['markov_randline_lastts'].setdefault(trigger.sender,[0,0])
+	np[0] += 1 #message counter
+	if np[0] > 10:#reset it, we need a short-term assessment
+		np = [1, time.time() - (time.time() - np[1]) / np[0]]
+	bot.memory['markov_randline_lastts'][trigger.sender] = np
+
+@willie.module.interval(60)
+def randspitline(bot):
+	probdiv = bot.memory['markov_randline_probdiv']
+	for chan in bot.memory['markov_randline_lastts']:
+		chlt = bot.memory['markov_randline_lastts'][chan]
+		if not chlt[0]:
+			continue
+		else:
+			ntime = (time.time() - chlt[1]) / chlt[0]
+			bot.memory['markov_randline_lastts'][chan] = [0, time.time()]
+			prob = (ntime / probdiv)**1.3
+			if random.random() <= prob:
+				print prob
+				bot.msg(chan, genline(bot))
+
+
+addline_mutex = threading.BoundedSemaphore(1)
+@willie.module.rule('^[^.].*$')
+def addline(bot, trigger):
+	'''adds line to markov-chain DB'''
+	sys.stderr.write('{}: {} threads.\n'.format(time.time(), len(threading.enumerate())))
+	if trigger.sender.lower() not in addwl:
+		return
+	addline_mutex.acquire()
+	with sqlite3.connect(bot.memory['markov_db']) as conn:
+		db = Db(sqlite3.connect(bot.memory['markov_db']), Sql())
+		sentence=trigger.group(0)
+		Parser('', db, SENTENCE_SEPARATOR, WORD_SEPARATOR).parse(sentence)
+		del db
+	firstword = sentence.split()[0]
+	bot.memory['markov_firstwordcache'][firstword] = bot.memory['markov_firstwordcache'].setdefault(firstword, 0) + 1
+	addline_mutex.release()
