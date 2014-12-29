@@ -312,12 +312,14 @@ def addline(bot, trigger):
 	sys.stderr.write('{}: {} threads.\n'.format(time.time(), len(threading.enumerate())))
 	if trigger.sender.lower() not in addwl:
 		return
-	addline_mutex.acquire()
-	with sqlite3.connect(bot.memory['markov_db']) as conn:
-		db = Db(sqlite3.connect(bot.memory['markov_db']), Sql())
-		sentence=trigger.group(0)
-		Parser('', db, SENTENCE_SEPARATOR, WORD_SEPARATOR).parse(sentence)
-		del db
-	firstword = sentence.split()[0]
-	bot.memory['markov_firstwordcache'][firstword] = bot.memory['markov_firstwordcache'].setdefault(firstword, 0) + 1
-	addline_mutex.release()
+	try:
+		addline_mutex.acquire()
+		with sqlite3.connect(bot.memory['markov_db']) as conn:
+			db = Db(sqlite3.connect(bot.memory['markov_db']), Sql())
+			sentence=trigger.group(0)
+			Parser('', db, SENTENCE_SEPARATOR, WORD_SEPARATOR).parse(sentence)
+			del db
+		firstword = sentence.split()[0]
+		bot.memory['markov_firstwordcache'][firstword] = bot.memory['markov_firstwordcache'].setdefault(firstword, 0) + 1
+	finally:
+		addline_mutex.release()
