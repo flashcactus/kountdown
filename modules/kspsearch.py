@@ -6,20 +6,28 @@ Adds commands for searching/googling the KSP forums and mod sites
 from willie.module import commands, example
 import willie.modules.search as search
 
+def duck(query):
+    #If the API gives us something, say it and stop
+    result = search.duck_api(query)
+    if result:
+        return result
+    #Otherwise, look it up on the HTMl version
+    return search.duck_search(query)
+
 
 @commands('kf','kforums','gf','sf','forumsearch','searchforums')
 @example('.kf high contrast navball')
 def gf(bot, trigger):
-    """.kf, .gf, .sf: Google the KSP forums for the input"""
+    """.kf, .gf, .sf: Search the KSP forums for the input"""
     query = trigger.group(2)
     if not query:
         return bot.reply('what do you want me to search for?')
-    uri = search.google_search('site:forum.kerbalspaceprogram.com '+query)
+    uri = duck('site:forum.kerbalspaceprogram.com '+query)
     if uri:
         bot.reply(uri)
         bot.memory['last_seen_url'][trigger.sender] = uri
     elif uri is False:
-        bot.reply("Problem getting data from Google.")
+        bot.reply("Problem getting data from DDG.")
     else:
         bot.reply("No results found for '%s'." % query)
 
@@ -30,7 +38,7 @@ def kstuff(bot, trigger):
     query = trigger.group(2)
     if not query:
         return bot.reply('what do you want me to search for?')
-    uri = search.google_search('site:kerbalstuff.com '+query)
+    uri = duck('site:kerbalstuff.com '+query)
     if uri:
         bot.reply(uri)
         bot.memory['last_seen_url'][trigger.sender] = uri
@@ -47,11 +55,11 @@ def kwiki(bot, trigger):
     query = trigger.group(2)
     if not query:
         return bot.reply('what do you want me to search for?')
-    uri = search.google_search('site:wiki.kerbalspaceprogram.com '+query)
+    uri = duck('site:wiki.kerbalspaceprogram.com '+query)
     if uri:
         bot.reply(uri)
         bot.memory['last_seen_url'][trigger.sender] = uri
     elif uri is False:
-        bot.reply("Problem getting data from Google.")
+        bot.reply("Problem getting data from DDG.")
     else:
         bot.reply("No results found for '%s'." % query)
