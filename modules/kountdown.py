@@ -1,12 +1,15 @@
+# -*- coding: utf-8 -*-
 import willie
 import time
 import re
+import threading
 
 queue=[]
 events={}
 #
 #full: tline = [86400, 82800, 79200, 75600, 72000, 68400, 64800, 61200, 57600, 54000, 50400, 46800, 43200, 39600, 36000, 32400, 28800, 25200, 21600, 18000, 14400, 10800, 7200, 3600]+\
-tline = [24*3600, 18*3600, 12*3600, 9*3600, 6*3600, 4*3600, 3*3600, 2*3600, 3600]+\
+tline = [10*24*3600, 7*24*3600 ,5*24*3600 ,4*24*3600 ,3*24*3600, 2*24*3600, 36*3600, 24*3600]+\
+[18*3600, 12*3600, 9*3600, 6*3600, 4*3600, 3*3600, 2*3600, 3600]+\
 [45*60 ,30*60 ,15*60, 5*60, 60, 0]#, 30, 0]#,15,0]#,10,5,0]
 interval = 5
 ok_channels=[]#['#bottorture', 'cactus'] #deprecated
@@ -39,6 +42,19 @@ class Event():
 		return "Event "+str(self.id)+" | %s (%s) at %s [unixtime %.1f]" % (self.name, self.desc, timestr(self.time), self.time)
 
 
+class ParsingError(Exception):
+	pass
+
+
+def restrictedcommand(f):
+	def repfun(bot, trigger, *args, **kwargs):
+		if str(trigger.nick).lower() not in bot.memory['kd_admins']:
+			bot.say("admin-only command.")
+			return
+		return f(bot, trigger, *args, **kwargs)
+	return repfun
+	
+
 #########################################################################
 
 def pack_events(events):
@@ -65,15 +81,17 @@ def saveevents(bot):
 def timeleft(seconds):
 	'''returns a string representation of the time left'''
 	if seconds <= 0:
-		return "0 seconds"
+		return "No time"
+	adds = lambda n: '' if n%100 == 1 else 's'
+	pinz = lambda s, v: s if v else ''
 	days=seconds//86400;seconds-=86400*days
 	hours=seconds//3600;seconds-=3600*hours
 	mins=seconds//60;seconds-=60*mins
 	s=\
-('%d day(s) ' % days if days else '') +\
-('%d hour(s) ' % hours if hours else '') +\
-('%d minute(s) ' % mins if mins else '') +\
-('%.2f second(s)' % seconds if seconds else '')
+pinz('%d day%s ' % (days,adds(days)), days) +\
+pinz('%d hour%s ' % (hours,adds(hours)), hours) +\
+pinz('%d minute%s ' % (mins,adds(mins)), mins) +\
+pinz('%.2f second%s' % (seconds,adds(seconds)), seconds)
 	return s.strip()
 
 
@@ -84,9 +102,6 @@ def timestr(unixtime=None, offset=0, fstring="%Y-%m-%d %H:%M:%S UTC%z"):
 	tt=time.gmtime(unixtime)
 	return time.strftime(fstring,tt)
 
-
-class ParsingError(Exception):
-	pass
 
 time_patterns = (
 re.compile("[Uu](\d{4,5})-(\d{1,2})-(\d{1,2})-(\d{1,2})[:.](\d{1,2})[:.](\d{1,2})"), 
@@ -160,11 +175,13 @@ def setup(bot):
 		print(subscrl,bot.memory['kd_subscribers'])
 	except Exception as e:
 		bot.memory['kd_subscribers']=set()
-
-	admins=set(bot.config.core.get_list('admins'))
-	admins.update(set(bot.config.kdown.get_list('admins')))
+	bot.memory.setdefault('ctmutex', threading.BoundedSemaphore(1)) #CheckTime Mutex
+	
+	lstr = lambda o: str(o).lower()
+	admins=set(map(lstr, bot.config.core.get_list('admins')))
+	admins.update(set(map(lstr, bot.config.kdown.get_list('admins'))))
 	admins.add(bot.config.core.owner)
-	bot.memory['kd_admins']=admins
+	bot.memory['kd_admins'] = admins
 #	print(bot.memory['kd_admins'])
 
 
@@ -172,14 +189,12 @@ def setup(bot):
 ##################################################################
 
 @willie.module.commands('addevent','addevt','addkd','kdadd')
+@restrictedcommand
 def addevt(bot,trigger):
 	'''Add countdown event. 
 Syntax: .addevent name|description|time. Refer to https://github.com/flashcactus/kountdown/wiki/Time-Format for valid time formats.
 This command is currently available only to kd-admins.
 '''
-	if str(trigger.nick) not in bot.memory['kd_admins']:
-		bot.say("admin-only command.")
-		return
 	if bot.memory.contains('kd_evnctr'):
 		evnctr=int(bot.config.kdown.ev_ctr)
 	else:
@@ -194,6 +209,7 @@ This command is currently available only to kd-admins.
 
 	except ParsingError:
 		bot.reply("Wrong time format. See https://github.com/flashcactus/kountdown/wiki/Time-Format for valid formats.")
+		return
 	bot.memory['kd_events'][evnctr]=Event(evnctr,name,desc,s_time,bot)
 	bot.config.kdown.ev_ctr=evnctr+1
 	saveevents(bot)
@@ -215,22 +231,36 @@ def lsevents(bot,trigger):
 				)
 			bot.msg(trigger.nick, "Description: %s " % evt.desc)
 
+@willie.module.commands('kdesc','kdetails','kd')
+@willie.module.example('.kd 42')
+def kdesc(bot, trigger):
+	'''.kdesc, .kdetails, .kd: Prints out the details of a Kountdown Event.'''
+	try:
+		evno = int(trigger.group(2))
+		evt = bot.memory['kd_events'][evno]
+	except ValueError, KeyError:
+		bot.reply('No such event. Current events: %s.' % ', '.join(map(str,bot.memory['kd_events'])))
+		return
+	bot.reply("id:%3d | Name:%s | time: %s | unixtime:%.1f | %s left" % \
+		( evt.id, evt.name, timestr(evt.time), evt.time, timeleft(evt.time - time.time()) )\
+		)
+	bot.reply("Description: %s " % evt.desc)
+	
+	
+
 @willie.module.commands('rmkd','kdrm','rmevent','rmevt')
+@restrictedcommand
 def rmevent(bot,trigger):
 	'''Delete countdown by id. Available to kd-admins only.'''
-	if str(trigger.nick) in bot.memory['kd_admins']:
-		try:
-			k=int(trigger.group(2))
-			del bot.memory['kd_events'][k]
-			bot.config.kdown.events=pack_events(bot.memory['kd_events'])
-			bot.config.save()
-			bot.say("event deleted.")
-		except:
-			pass
-	else:
-		print(trigger.nick)
-		print(bot.memory['kd_admins'])
-		bot.say("admin-only command.")
+	try:
+		k=int(trigger.group(2))
+		del bot.memory['kd_events'][k]
+		bot.config.kdown.events=pack_events(bot.memory['kd_events'])
+		bot.config.save()
+		bot.say("event deleted.")
+	except Exception as e:
+		bot.say('¯\(°_o)/¯')
+		print(e)
 
 
 @willie.module.commands('subscribe')
@@ -246,7 +276,7 @@ def chansubscr(bot,trigger):
 	'''.subschan [channel]: Subscribe a channel to countdowns. This command is only available to the ops of the channel in question and bot admins. If channel argument is not given, subscribes the channel the command is issued in.'''
 	chan=trigger.group(2)
 	chan=chan.strip() if chan else trigger.sender
-	if str(trigger.nick) in bot.ops.get(chan, []) or str(trigger.nick) in bot.config.core.get_list('admins'):
+	if str(trigger.nick) in bot.ops.get(chan, []) or str(trigger.nick).lower() in bot.config.core.get_list('admins'):
 		chan=chan.lower()
 		if chan in bot.memory['kd_subscribers']:
 			bot.say('This channel is already subscribed.')
@@ -336,17 +366,13 @@ def chevent(bot,trigger):
 
 
 
-ctmutex = False #CheckTime Mutex
 ##########################################################
 
 @willie.module.interval(interval)
 def check_time(bot):
-	global ctmutex
 	ctime=time.time()
-	if ctmutex:
+	if not bot.memory['ctmutex'].acquire(blocking=False):
 		return
-	else:
-		ctmutex=True
 	try:
 		if bot.memory['kd_queue'][0][0] <= ctime:
 			#print(bot.memory['kd_queue'])
@@ -356,7 +382,7 @@ def check_time(bot):
 			except KeyError: #nonexistant event
 				print("nonexistant event!")
 				bot.memory['kd_queue'].pop(0)
-				ctmutex=False
+				bot.memory['ctmutex'].release()
 				return
 			tmlefts=timeleft(int(evt.time - bot.memory['kd_queue'][0][0]))
 			if(evt.time <= ctime):		#event has happened already
@@ -364,16 +390,21 @@ def check_time(bot):
 				bot.config.kdown.events=pack_events(bot.memory['kd_events'])
 				bot.config.save()
 			else:
+				mpref = '%s left to event #%d: %s' % (tmlefts, evt.id, evt.name)
+				privm = '<< ! >> ' + mpref + "(%s) at %s [unixtime %.1f]" % (evt.desc, timestr(evt.time), evt.time)
+				chanm = mpref + " [at %s]. Say '.kd %d' for details." % (timestr(evt.time), evt.id)
 				for chan in ok_channels+list(bot.memory['kd_subscribers']):
-					bot.msg( chan, '<<  !  >>  No more than %s left until %s' % (tmlefts, str(evt)) )
+					if chan[0] == '#':
+						bot.notice(chan, chanm)
+					else:
+						bot.msg(chan, privm)
 			bot.memory['kd_queue'].pop(0)
 	except IndexError as e:
 		pass
 	except Exception as e:
-		ctmutex=False
 		raise e
 	finally:
-		ctmutex=False
+		bot.memory['ctmutex'].release()
 
 
 ########################################################################
