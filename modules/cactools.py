@@ -50,7 +50,7 @@ def setcactus(bot, trigger):
 def redirect(bot,trigger):
 	bot.msg(bot.config.core.owner, "!hilight! %s in %s : %s" % (trigger.nick, trigger.sender, trigger.group(1)))
 	if bot.memory.get('cactrack_name', False):
-		bot.msg( bot.memory['cactrack_name'],  "!hilight! %s in %s : %s" % (trigger.nick, trigger.sender, trigger.group(1)))
+		bot.notice("!hilight! %s in %s : %s" % (trigger.nick, trigger.sender, trigger.group(1)), bot.memory['cactrack_name'])#more magic
 
 
 
@@ -59,7 +59,7 @@ def redirpc(bot,trigger):
 	if(trigger.nick == trigger.sender) or (trigger.group(0)[0]=='.' and trigger.group(0)[:2]!='..'):
 		bot.msg(bot.config.core.owner, "%s in %s : %s" % (trigger.nick, trigger.sender, trigger.group(1)))
 		if bot.memory.get('cactrack_name', False):
-			bot.msg( bot.memory['cactrack_name'],  "%s in %s : %s" % (trigger.nick, trigger.sender, trigger.group(1)))
+			bot.msg( bot.memory['cactrack_name'], "%s in %s : %s" % (trigger.nick, trigger.sender, trigger.group(1)))
 	
 
 ###############-links-###############
@@ -75,23 +75,36 @@ links = {
 	'kspotrolls':'http://legion.flashcact.us/pub/wordcloud/kspotrolls.txt',
 	
 	'markov':'http://agiliq.com/blog/2009/06/generating-pseudo-random-text-with-markov-chains-u/',
+	'logs':'http://legion.flashcact.us/pub/kountdown-logs/',
+
+	'isp':'http://legion.flashcact.us/isp.html'
 }
 
+sbs = lambda s: s if s else ' '
+
 @willie.module.commands('ltell')
+@willie.module.example('.ltell Rokker rokkergram')
 def telllink(bot, trigger):
-	target, key = trigger.group(2).strip().split(' ', 1)
-	link = links.get(key.lower().replace(' ', ''))
+	'''.ltell <target> <key>: pastes a link to <target>. Sending the command without arguments yields the list of available keys. 
+	See also: .link
+	'''
+	target, key = sbs(trigger.group(2)).split(' ', 1)
+	link = links.get(key.lower().strip().replace(' ', ''))
 	if link:
 		bot.say(target + ': ' + link)
 	else:
-		bot.reply(key + " not found.")
+		bot.reply("'" + key + "' not found. Available keys: " + ', '.join(links))
 
 @willie.module.commands('link')
+@willie.module.example('.link rokkergram')
 def postlink(bot, trigger):
-	key = trigger.group(2).strip()
+	'''.link <key>: pastes a frequently-used link. Sending the command without arguments yields the list of available keys. 
+	See also: .ltell
+	'''
+	key = sbs(trigger.group(2)).strip()
 	link = links.get(key.lower().replace(' ', ''))
 	if link:
 		bot.reply(link)
 	else:
-		bot.reply(key + " not found.")
+		bot.reply("'" + key + "' not found. Available keys: " + ', '.join(links))
 
