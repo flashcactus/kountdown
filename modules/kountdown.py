@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+from __future__ import unicode_literals
 import willie
 import time
 import re
@@ -10,7 +11,7 @@ events={}
 #full: tline = [86400, 82800, 79200, 75600, 72000, 68400, 64800, 61200, 57600, 54000, 50400, 46800, 43200, 39600, 36000, 32400, 28800, 25200, 21600, 18000, 14400, 10800, 7200, 3600]+\
 tline = [10*24*3600, 7*24*3600 ,5*24*3600 ,4*24*3600 ,3*24*3600, 2*24*3600, 36*3600, 24*3600]+\
 [18*3600, 12*3600, 9*3600, 6*3600, 4*3600, 3*3600, 2*3600, 3600]+\
-[45*60 ,30*60 ,15*60, 5*60, 60, 0]#, 30, 0]#,15,0]#,10,5,0]
+[30*60 ,10*60, 5*30, 0]
 interval = 5
 ok_channels=[]#['#bottorture', 'cactus'] #deprecated
 
@@ -52,6 +53,7 @@ def restrictedcommand(f):
 			bot.say("admin-only command.")
 			return
 		return f(bot, trigger, *args, **kwargs)
+	repfun.__doc__ = f.__doc__
 	return repfun
 	
 
@@ -60,7 +62,7 @@ def restrictedcommand(f):
 def pack_events(events):
 	elst=[]
 	for e in events:
-		elst+=list(map(str,(events[e].id,events[e].name,events[e].desc,events[e].time)))
+		elst+=[str(events[e].id), events[e].name, events[e].desc, str(events[e].time)]
 	return '|'.join(elst)
 		
 def unpack_events(bot, pacstring):
@@ -238,13 +240,17 @@ def kdesc(bot, trigger):
 	try:
 		evno = int(trigger.group(2))
 		evt = bot.memory['kd_events'][evno]
-	except ValueError, KeyError:
-		bot.reply('No such event. Current events: %s.' % ', '.join(map(str,bot.memory['kd_events'])))
-		return
-	bot.reply("id:%3d | Name:%s | time: %s | unixtime:%.1f | %s left" % \
-		( evt.id, evt.name, timestr(evt.time), evt.time, timeleft(evt.time - time.time()) )\
-		)
-	bot.reply("Description: %s " % evt.desc)
+		bot.reply("id:%3d | Name:%s | time: %s | unixtime:%.1f | %s left" % \
+			( evt.id, evt.name, timestr(evt.time), evt.time, timeleft(evt.time - time.time()) )\
+			)
+		bot.reply("Description: %s " % evt.desc)
+	except KeyError:
+		pass
+	except ValueError:
+		pass
+	bot.reply('No such event. Current events: %s.' % ', '.join(map(str,bot.memory['kd_events'])))
+	return
+
 	
 	
 
@@ -353,15 +359,18 @@ def chevent(bot,trigger):
 	else:
 		if '|' in cmnd[2]:
 			bot.say("the pipe character is not permitted right now. Poke cactus if you really want it to be.")
+			return
+
+		if cmnd[1][0]=='n':
+			bot.memory['kd_events'][int(cmnd[0])].name=cmnd[2]
+			bot.say('name changed successfully')
+		elif cmnd[1][0]=='d':
+			bot.memory['kd_events'][int(cmnd[0])].desc=cmnd[2]
+			bot.say('description changed successfully')
 		else:
-			if cmnd[1][0]=='n':
-				bot.memory['kd_events'][int(cmnd[0])].name=cmnd[2]
-				bot.say('name changed successfully')
-			elif cmnd[1][0]=='d':
-				bot.memory['kd_events'][int(cmnd[0])].desc=cmnd[2]
-				bot.say('description changed successfully')
-			else:
-				bot.say("Something went wrong. Very wrong.")
+			bot.say("Something went wrong. Terribly wrong.")
+			return
+		saveevents(bot)
 
 
 
