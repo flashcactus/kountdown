@@ -69,7 +69,7 @@ def setup(bot=None):
 
     #hacked-in switch
     if bot.config.has_option('url', 'auto'):
-	bot.memory['url_auto']=bot.config.url.auto
+        bot.memory['url_auto']=bot.config.url.auto
     else:
         bot.memory['url_auto']=True
 
@@ -135,16 +135,16 @@ def title_auto(bot, trigger):
     urls = re.findall(url_finder, trigger)
     bot.memory['last_seen_url'][trigger.sender] = urls[-1]
     if bot.memory['url_auto']:
-	    results = process_urls(bot, trigger, urls)
+        results = process_urls(bot, trigger, urls)
 
-	    for title, domain in results[:4]:
-		message = '[ %s ] - %s' % (title, domain)
+        for title, domain in results[:4]:
+            message = '[ %s ] - %s' % (title, domain)
 
-		# Guard against responding to other instances of this bot.
-		#bot.say(str(bot.config.url.auto))
-		#bot.say(str(bot.memory['url_auto']))
-		if message != trigger :
-		    bot.say( message)
+            # Guard against responding to other instances of this bot.
+            #bot.say(str(bot.config.url.auto))
+            #bot.say(str(bot.memory['url_auto']))
+            if message != trigger :
+                bot.say( message)
 
 def process_urls(bot, trigger, urls):
     """
