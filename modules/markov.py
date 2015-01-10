@@ -166,7 +166,7 @@ class Parser:
 			self.db.commit()
 			i += 1
 			if i % 1000 == 0:
-				print i
+				print(i)
 				sys.stdout.flush()
 
 
@@ -175,12 +175,13 @@ class Parser:
 #
 SENTENCE_SEPARATOR = '\n'
 WORD_SEPARATOR = ' '
+db_mutex = threading.BoundedSemaphore(1)
 
 addwl=['markovchaincactus', 'theothercactus', '#kspofficial'] #whitelisted channels (the ones that lines will be added from)
 
 def setup(bot):
 	bot.memory['markov_db'] = bot.config.markov.db #'/home/cactus/.willie/markov4.db'
-	bot.memory['markov_randline_probdiv'] = bot.config.markov.probdiv #1800
+	bot.memory['markov_randline_probdiv'] = int(bot.config.markov.randl_probdiv) #1800
 	bot.memory['markov_randline_lastts'] = {}
 	bot.memory['markov_autochans'] = set(bot.config.markov.get_list('autochans'))
 	if not bot.memory.setdefault('markov_firstwordcache', {}):
@@ -188,36 +189,47 @@ def setup(bot):
 		print(gen_new_fwcache(bot))
 
 def gen_new_fwcache(bot):#generate a quick-lookup buffer for first words (as it tends to be quite sizeable)
-	db = Db(sqlite3.connect(bot.memory['markov_db']), Sql())
-	depth = db.get_depth()
-	bot.memory['markov_firstwordcache'] = db.get_word_count([Parser.SENTENCE_START_SYMBOL] * (depth - 1)) #get the actual dict
-	del db
-	return len(bot.memory['markov_firstwordcache'])
+	db = None
+	try:
+		db_mutex.acquire()
+		db = Db(sqlite3.connect(bot.memory['markov_db']), Sql())
+		depth = db.get_depth()
+		bot.memory['markov_firstwordcache'] = db.get_word_count([Parser.SENTENCE_START_SYMBOL] * (depth - 1)) #get the actual dict
+	finally:
+		try:
+			del db
+		finally:
+			db_mutex.release()
+		return len(bot.memory['markov_firstwordcache'])
 
 
 def genline(bot, word_separator=' '):
 	'''generates a random line.'''
-	db = Db(sqlite3.connect(bot.memory['markov_db']), Sql()) #DB objects are not shareable between threads, so we need to create a new one each time.
-	if not bot.memory['markov_firstwordcache']:
-		gen_new_fwcache(bot) #generate the cache if we don't have any
-	depth = db.get_depth()
- 	#look the first word up in the cache
-	sentence = [Parser.SENTENCE_START_SYMBOL] * (depth - 1) + [select_next_word(bot.memory['markov_firstwordcache'])]
-	end_symbol = [Parser.SENTENCE_END_SYMBOL] * (depth - 1)
-	while True:
-		tail = sentence[(-depth+1):]
-		if tail == end_symbol:
-			break
-		candidate_words = db.get_word_count(tail)
-		if len(candidate_words) > 1:
-			print(str(len(candidate_words)) + str(tail))
-			if len(candidate_words) < 10:
-				print(candidate_words)
-		word = select_next_word(candidate_words)
-		sentence.append(word)
-	del db
-	print('')
-	return word_separator.join(sentence[depth-1:][:1-depth])
+	try:
+		db_mutex.acquire()
+		db = Db(sqlite3.connect(bot.memory['markov_db']), Sql()) #DB objects are not shareable between threads, so we need to create a new one each time.
+		if not bot.memory['markov_firstwordcache']:
+			gen_new_fwcache(bot) #generate the cache if we don't have any
+		depth = db.get_depth()
+		#look the first word up in the cache
+		sentence = [Parser.SENTENCE_START_SYMBOL] * (depth - 1) + [select_next_word(bot.memory['markov_firstwordcache'])]
+		end_symbol = [Parser.SENTENCE_END_SYMBOL] * (depth - 1)
+		while True:
+			tail = sentence[(-depth+1):]
+			if tail == end_symbol:
+				break
+			candidate_words = db.get_word_count(tail)
+			if len(candidate_words) > 1:
+				print(str(len(candidate_words)) + str(tail))
+				if len(candidate_words) < 10:
+					print(candidate_words)
+			word = select_next_word(candidate_words)
+			sentence.append(word)
+		del db
+	finally:
+		db_mutex.release()
+		print('')
+		return word_separator.join(sentence[depth-1:][:1-depth])
 	
 
 def select_next_word(candidate_words):
@@ -274,9 +286,8 @@ def chanunsub(bot,trigger):
 
 @willie.module.rule('(?i)^$nickname[,:!].*|.*$nickname(?:.{0,5}|.+[?!])$|.*automatic appeals.*')
 def asl(bot, trigger):
-#	if trigger.sender.strip().lower() not in bot.memory['markov_autochans']:
-#		return
-	spitline(bot, trigger)
+	if trigger.sender.strip().lower() in bot.memory['markov_autochans']:
+		spitline(bot, trigger)
 
 
 @willie.module.rule('.*')
@@ -301,25 +312,28 @@ def randspitline(bot):
 			bot.memory['markov_randline_lastts'][chan] = [0, time.time()]
 			prob = (ntime / probdiv)**1.3
 			if random.random() <= prob:
-				print prob
+				print(prob)
 				bot.msg(chan, genline(bot))
 
 
-addline_mutex = threading.BoundedSemaphore(1)
 @willie.module.rule('^[^.].*$')
 def addline(bot, trigger):
 	'''adds line to markov-chain DB'''
-	sys.stderr.write('{}: {} threads.\n'.format(time.time(), len(threading.enumerate())))
+	#sys.stderr.write('{}: {} threads.\n'.format(time.time(), len(threading.enumerate())))
 	if trigger.sender.lower() not in addwl:
 		return
+	sentence=trigger.group(0)
 	try:
-		addline_mutex.acquire()
+		db_mutex.acquire()
 		with sqlite3.connect(bot.memory['markov_db']) as conn:
 			db = Db(sqlite3.connect(bot.memory['markov_db']), Sql())
-			sentence=trigger.group(0)
 			Parser('', db, SENTENCE_SEPARATOR, WORD_SEPARATOR).parse(sentence)
 			del db
-		firstword = sentence.split()[0]
-		bot.memory['markov_firstwordcache'][firstword] = bot.memory['markov_firstwordcache'].setdefault(firstword, 0) + 1
 	finally:
-		addline_mutex.release()
+		db_mutex.release()
+	try:
+		firstword = sentence.split()[0]
+	except IndexError:
+		return
+	bot.memory['markov_firstwordcache'][firstword] = bot.memory['markov_firstwordcache'].setdefault(firstword, 0) + 1
+
