@@ -14,8 +14,8 @@ def summon_ops(bot, trigger):
 	.ops, .summonops: summons all channel ops by spitting out a line with their names in it. 
 	THIS COMMAND SHOULD ONLY BE USED IN EMERGENCIES IF YOU DON'T WANT TO BE SMOTE FOR SPAMMING.
 	"""
-	chan = trigger.sender.strip()
-	nick = trigger.nick.strip()
+	chan = trigger.sender
+	nick = trigger.nick
 	if chan == nick:
 		bot.say("This command is pointless in private.")	
 		return
