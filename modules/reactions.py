@@ -26,7 +26,7 @@ def citation(bot, trigger):
 def stare_back(bot, trigger):
         bot.msg(trigger.sender,"\x01ACTION glares at "+trigger.nick+"\x01")
 
-@willie.module.rule('(?i)^(?:\x01ACTION)? *(?:slaps|zaps|kicks|hits|smacks|chokes).*$')
+@willie.module.rule('(?i)^(?:\x01ACTION)? *(?:slaps|zaps|kicks|hits|smacks|chokes|stabs|suffocates|burns).*$')
 def slap_back(bot, trigger):
 	bot.msg(trigger.sender,"\x01ACTION zaps "+trigger.nick+"\x01")
 
