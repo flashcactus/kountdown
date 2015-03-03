@@ -134,7 +134,7 @@ def title_auto(bot, trigger):
         return
     urls = re.findall(url_finder, trigger)
     bot.memory['last_seen_url'][trigger.sender] = urls[-1]
-    if bot.memory['url_auto']:
+    if (not bot.config.has_option('url', 'auto')) or bot.config.url.auto:
         results = process_urls(bot, trigger, urls)
 
         for title, domain in results[:4]:
