@@ -286,7 +286,7 @@ def chanunsub(bot,trigger):
 
 @willie.module.rule('(?i)^$nickname[,:!].*|.*$nickname(?:.{0,5}|.+[?!])$|.*automatic appeals.*')
 def asl(bot, trigger):
-	if trigger.sender.strip().lower() in bot.memory['markov_autochans']:
+	if True:
 		spitline(bot, trigger)
 
 
