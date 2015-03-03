@@ -237,6 +237,7 @@ def lsevents(bot,trigger):
 @willie.module.example('.kd 42')
 def kdesc(bot, trigger):
     '''.kdesc, .kdetails, .kd: Prints out the details of a Kountdown Event.'''
+    reply='No such event. '
     try:
         evno = int(trigger.group(2))
         evt = bot.memory['kd_events'][evno]
@@ -249,7 +250,9 @@ def kdesc(bot, trigger):
         pass
     except ValueError:
         pass
-    bot.reply('No such event. Current events: %s.' % ', '.join(map(str,bot.memory['kd_events'])))
+    except TypeError:
+        reply=''
+    bot.reply(reply + 'Current events: %s.' % ', '.join(map(str,bot.memory['kd_events'])))
 
     
     
@@ -336,9 +339,11 @@ def chevent(bot,trigger):
           Name&desc must not contain the pipe character (bug cactus if you really want it).
           You could get the event id and current values via the .lsevents command.
     '''
+    if trigger.group(2) is None:
+        bot.say("invalid command format. see .help chkd for details.")
     cmnd = trigger.group(2).split(None, 2)
     if len(cmnd)<3 or cmnd[1] not in ['n','t','d','name','time','desc'] or not cmnd[0].isdigit():
-        bot.say("invalid command format. see .help chevt for details.")
+        bot.say("invalid command format. see .help chkd for details.")
     elif int(cmnd[0]) not in bot.memory['kd_events']:
         bot.say("I don't know of an active event with id %s." % cmnd[0])
     elif cmnd[1][0]=='t':
@@ -358,7 +363,7 @@ def chevent(bot,trigger):
         bot.say('time changed successfully.')
     else:
         if '|' in cmnd[2]:
-            bot.say("the pipe character is not permitted right now. Poke cactus if you really want it to be.")
+            bot.say("The pipe character is not permitted. Poke cactus if you really want it to be.")
             return
 
         if cmnd[1][0]=='n':
@@ -380,6 +385,8 @@ def chevent(bot,trigger):
 @willie.module.interval(interval)
 def check_time(bot):
     ctime=time.time()
+    if not len(bot.memory['kd_queue']):
+        return
     if not bot.memory['ctmutex'].acquire(blocking=False):
         return
     try:
