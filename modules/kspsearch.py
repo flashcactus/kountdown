@@ -25,7 +25,8 @@ def gf(bot, trigger):
     uri = duck('site:forum.kerbalspaceprogram.com '+query)
     if uri:
         bot.reply(uri)
-        bot.memory['last_seen_url'][trigger.sender] = uri
+        if 'last_seen_url' in bot.memory:
+                bot.memory['last_seen_url'][trigger.sender] = uri
     elif uri is False:
         bot.reply("Problem getting data from DDG.")
     else:
@@ -41,7 +42,8 @@ def kstuff(bot, trigger):
     uri = duck('site:kerbalstuff.com '+query)
     if uri:
         bot.reply(uri)
-        bot.memory['last_seen_url'][trigger.sender] = uri
+        if 'last_seen_url' in bot.memory:
+                bot.memory['last_seen_url'][trigger.sender] = uri
     elif uri is False:
         bot.reply("Problem getting search results.")
     else:
@@ -58,7 +60,8 @@ def kwiki(bot, trigger):
     uri = duck('site:wiki.kerbalspaceprogram.com '+query)
     if uri:
         bot.reply(uri)
-        bot.memory['last_seen_url'][trigger.sender] = uri
+        if 'last_seen_url' in bot.memory:
+                bot.memory['last_seen_url'][trigger.sender] = uri
     elif uri is False:
         bot.reply("Problem getting data from DDG.")
     else:
