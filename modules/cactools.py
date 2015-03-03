@@ -69,6 +69,7 @@ links = {
 
 	'ktime':'https://github.com/flashcactus/kountdown/wiki/Time-Format',
 	'timeformat':'https://github.com/flashcactus/kountdown/wiki/Time-Format',
+	'kdavatar':'http://l.flashcact.us/img/pub/ksp/kd/kdsp.png',
 	
 	'rokkergram':'http://legion.flashcact.us/pub/wordcloud/kspotrolls.png',
 	'kspocloud':'http://legion.flashcact.us/pub/wordcloud/kspotrolls.png',
@@ -76,6 +77,9 @@ links = {
 	
 	'markov':'http://agiliq.com/blog/2009/06/generating-pseudo-random-text-with-markov-chains-u/',
 	'logs':'http://legion.flashcact.us/pub/kountdown-logs/',
+        'fortune':'http://l.flashcact.us/kdfortune/',
+        'fortunes':'http://l.flashcact.us/btf.txt',
+        'fortunefile':'http://l.flashcact.us/btf.txt',
 
 	'isp':'http://legion.flashcact.us/isp.html'
 }
