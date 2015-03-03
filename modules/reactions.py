@@ -13,6 +13,8 @@ citations = [
 		'http://en.wikipedia.org/wiki/Case_citation',
 		'http://en.wikipedia.org/wiki/Traffic_citation',
 		'http://en.wikipedia.org/wiki/Citation',
+                'http://en.wikipedia.org/wiki/Cetacean',
+                'http://en.wikipedia.org/wiki/List_of_cetaceans',
 	]
 @willie.module.rule('(?:.*[^A-Za-z])?[Cc]itation needed')
 #@willie.module.commands('citation', 'cite')
