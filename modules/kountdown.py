@@ -7,13 +7,11 @@ import threading
 
 queue=[]
 events={}
-#
-#full: tline = [86400, 82800, 79200, 75600, 72000, 68400, 64800, 61200, 57600, 54000, 50400, 46800, 43200, 39600, 36000, 32400, 28800, 25200, 21600, 18000, 14400, 10800, 7200, 3600]+\
+
 tline = [10*24*3600, 7*24*3600 ,5*24*3600 ,4*24*3600 ,3*24*3600, 2*24*3600, 36*3600, 24*3600]+\
 [18*3600, 12*3600, 9*3600, 6*3600, 4*3600, 3*3600, 2*3600, 3600]+\
 [30*60 ,10*60, 5*30, 0]
 interval = 5
-ok_channels=[]#['#bottorture', 'cactus'] #deprecated
 
 class Event():
     def __init__(self, idn, name, desc, s_time, bot):
@@ -156,18 +154,12 @@ def setup(bot):
     except:
         bot.memory['kd_evnctr']=0
     
-    #try:
-    if True:
-        print(bot.config.kdown.events)    
-        events=unpack_events(bot, bot.config.kdown.events)
-        bot.memory['kd_events']=events
-        print(bot.memory['kd_events'])
-        print()
-        print(bot.memory['kd_queue'])
-#    except Exception as e:
-#        raise e
-#        bot.memory['kd_events']={}
-#    print(bot.memory['kd_events'])
+    print(bot.config.kdown.events)    
+    events=unpack_events(bot, bot.config.kdown.events)
+    bot.memory['kd_events']=events
+    print(bot.memory['kd_events'])
+    print()
+    print(bot.memory['kd_queue'])
     
     try:
         subscrl=bot.config.kdown.get_list('subscribers')
@@ -184,7 +176,6 @@ def setup(bot):
     admins.update(set(map(lstr, bot.config.kdown.get_list('admins'))))
     admins.add(bot.config.core.owner)
     bot.memory['kd_admins'] = admins
-#    print(bot.memory['kd_admins'])
 
 
 
@@ -409,7 +400,7 @@ def check_time(bot):
                 mpref = '%s left to event #%d: %s' % (tmlefts, evt.id, evt.name)
                 privm = '<< ! >> ' + mpref + "(%s) at %s [unixtime %.1f]" % (evt.desc, timestr(evt.time), evt.time)
                 chanm = mpref + " [at %s]. Say '.kd %d' for details." % (timestr(evt.time), evt.id)
-                for chan in ok_channels+list(bot.memory['kd_subscribers']):
+                for chan in list(bot.memory['kd_subscribers']):
                     if chan[0] == '#':
                         bot.notice(chan, chanm)
                     else:
@@ -422,5 +413,3 @@ def check_time(bot):
     finally:
         bot.memory['ctmutex'].release()
 
-
-########################################################################

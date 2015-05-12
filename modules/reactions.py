@@ -17,7 +17,7 @@ citations = [
                 'http://en.wikipedia.org/wiki/List_of_cetaceans',
 	]
 @willie.module.rule('(?:.*[^A-Za-z])?[Cc]itation needed')
-#@willie.module.commands('citation', 'cite')
+@willie.module.commands('citation', 'cite')
 def citation(bot, trigger):
 	"Replies with a smartypants link whenever someone requests a citation"
 	bot.reply(random.choice(citations))
@@ -32,11 +32,14 @@ def stare_back(bot, trigger):
 def slap_back(bot, trigger):
 	bot.msg(trigger.sender,"\x01ACTION zaps "+trigger.nick+"\x01")
 
-@willie.module.rule('(?i).*good bot.*$')
-@willie.module.rule('(?i).*bot ?snack.*$')
+@willie.module.rule('(?i).*(?:good bot|.*bot ?snack).*$')
 def snack(bot, trigger):
 	bot.reply('Thank you! Glad to be of service.')
 
 @willie.module.rule('(?i).*(?:bad bot|bot ?smack).*$')
 def bbf(bot, trigger):
     bot.say(':[')
+
+@willie.module.rule('(?i).*(?:needs? a hug|hug me).*$')
+def hug(bot,trigger):
+    bot.msg(trigger.sender,"\x01ACTION hugs "+trigger.nick+"\x01")
